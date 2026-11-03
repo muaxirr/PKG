@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Лабораторная работа №1 - Цветовые модели</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f9; }
+    h1 { color: #333; }
+    .container { display: flex; gap: 20px; flex-wrap: wrap; }
+    .card { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); width: 280px; }
+    .card h3 { margin-top: 0; }
+    .input-group { margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+    .input-group label { width: 30px; font-weight: bold; }
+    .input-group input[type="range"] { flex: 1; margin: 0 10px; }
+    .input-group input[type="number"] { width: 60px; }
+    #color-preview { width: 100%; height: 100px; border-radius: 8px; border: 1px solid #ccc; margin-top: 10px; }
+    #warning { color: #d9534f; font-weight: bold; margin-top: 15px; min-height: 24px; }
+    .picker-container { margin-bottom: 15px; }
+  </style>
+</head>
+<body>
+
+  <h1>Конвертер Цветовых Моделей</h1>
+
+  <div class="picker-container">
+    <label for="native-picker"><strong>Выберите цвет из палитры:</strong> </label>
+    <input type="color" id="native-picker" value="#ff0000">
+  </div>
+
+  <div id="warning"></div>
+
+  <div class="container">
+    <div class="card">
+      <h3>RGB</h3>
+      <div class="input-group"><label>R</label><input type="range" id="r-range" min="0" max="255"><input type="number" id="r-num" min="0" max="255"></div>
+      <div class="input-group"><label>G</label><input type="range" id="g-range" min="0" max="255"><input type="number" id="g-num" min="0" max="255"></div>
+      <div class="input-group"><label>B</label><input type="range" id="b-range" min="0" max="255"><input type="number" id="b-num" min="0" max="255"></div>
+    </div>
+
+    <div class="card">
+      <h3>CMYK</h3>
+      <div class="input-group"><label>C%</label><input type="range" id="c-range" min="0" max="100"><input type="number" id="c-num" min="0" max="100"></div>
+      <div class="input-group"><label>M%</label><input type="range" id="m-range" min="0" max="100"><input type="number" id="m-num" min="0" max="100"></div>
+      <div class="input-group"><label>Y%</label><input type="range" id="y-range" min="0" max="100"><input type="number" id="y-num" min="0" max="100"></div>
+      <div class="input-group"><label>K%</label><input type="range" id="k-range" min="0" max="100"><input type="number" id="k-num" min="0" max="100"></div>
+    </div>
+
+    <div class="card">
+      <h3>HSV</h3>
+      <div class="input-group"><label>H°</label><input type="range" id="hsv-h-range" min="0" max="360"><input type="number" id="hsv-h-num" min="0" max="360"></div>
+      <div class="input-group"><label>S%</label><input type="range" id="hsv-s-range" min="0" max="100"><input type="number" id="hsv-s-num" min="0" max="100"></div>
+      <div class="input-group"><label>V%</label><input type="range" id="hsv-v-range" min="0" max="100"><input type="number" id="hsv-v-num" min="0" max="100"></div>
+    </div>
+
+    <div class="card">
+      <h3>LAB</h3>
+      <div class="input-group"><label>L</label><input type="range" id="lab-l-range" min="0" max="100"><input type="number" id="lab-l-num" min="0" max="100"></div>
+      <div class="input-group"><label>a</label><input type="range" id="lab-a-range" min="-128" max="127"><input type="number" id="lab-a-num" min="-128" max="127"></div>
+      <div class="input-group"><label>b</label><input type="range" id="lab-b-range" min="-128" max="127"><input type="number" id="lab-b-num" min="-128" max="127"></div>
+    </div>
+  </div>
+
+  <h3>Предпросмотр цвета:</h3>
+  <div id="color-preview"></div>
+
+  <script>
+    let isUpdating = false;
+
+    function rgbToCmyk(r, g, b) {
+      let rN = r / 255, gN = g / 255, bN = b / 255;
+      let k = 1 - Math.max(rN, gN, bN);
+      if (k === 1) return [0, 0, 0, 100];
+      let c = (1 - rN - k) / (1 - k);
+      let m = (1 - gN - k) / (1 - k);
+      let y = (1 - bN - k) / (1 - k);
+      return [Math.round(c * 100), Math.round(m * 100), Math.round(y * 100), Math.round(k * 100)];
+    }
+
+    function cmykToRgb(c, m, y, k) {
+      let cN = c / 100, mN = m / 100, yN = y / 100, kN = k / 100;
+      let r = 255 * (1 - cN) * (1 - kN);
+      let g = 255 * (1 - mN) * (1 - kN);
+      let b = 255 * (1 - yN) * (1 - kN);
+      return [r, g, b];
+    }
+
+    function rgbToHsv(r, g, b) {
+      r /= 255; g /= 255; b /= 255;
+      let max = Math.max(r, g, b), min = Math.min(r, g, b);
+      let h, s, v = max;
+      let d = max - min;
+      s = max === 0 ? 0 : d / max;
+      if (max === min) {
+        h = 0;
+      } else {
+        if (max === r) {
+          h = (g - b) / d + (g < b ? 6 : 0);
+        } else if (max === g) {
+          h = (b - r) / d + 2;
+        } else {
+          h = (r - g) / d + 4;
+        }
+        h /= 6;
+      }
+      return [Math.round(h * 360), Math.round(s * 100), Math.round(v * 100)];
+    }
+
+    function hsvToRgb(h, s, v) {
+      h /= 360; s /= 100; v /= 100;
+      let r = 0, g = 0, b = 0;
+      let i = Math.floor(h * 6);
+      let f = h * 6 - i;
+      let p = v * (1 - s);
+      let q = v * (1 - f * s);
+      let t = v * (1 - (1 - f) * s);
+      let mod = i % 6;
+      if (mod === 0) { r = v; g = t; b = p; }
+      else if (mod === 1) { r = q; g = v; b = p; }
+      else if (mod === 2) { r = p; g = v; b = t; }
+      else if (mod === 3) { r = p; g = q; b = v; }
+      else if (mod === 4) { r = t; g = p; b = v; }
+      else if (mod === 5) { r = v; g = p; b = q; }
+      return [r * 255, g * 255, b * 255];
+    }
+
+    function rgbToXyz(r, g, b) {
+      r /= 255; g /= 255; b /= 255;
+      r = r > 0.04045 ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
+      g = g > 0.04045 ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
+      b = b > 0.04045 ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
+      return [
+        (r * 0.4124 + g * 0.3576 + b * 0.1805) * 100,
+        (r * 0.2126 + g * 0.7152 + b * 0.0722) * 100,
+        (r * 0.0193 + g * 0.1192 + b * 0.9505) * 100
+      ];
+    }
+
+    function xyzToRgb(x, y, z) {
+      x /= 100; y /= 100; z /= 100;
+      let r = x * 3.2406 + y * -1.5372 + z * -0.4986;
+      let g = x * -0.9689 + y * 1.8758 + z * 0.0415;
+      let b = x * 0.0557 + y * -0.2040 + z * 1.0570;
+      r = r > 0.0031308 ? 1.055 * Math.pow(r, 1/2.4) - 0.055 : 12.92 * r;
+      g = g > 0.0031308 ? 1.055 * Math.pow(g, 1/2.4) - 0.055 : 12.92 * g;
+      b = b > 0.0031308 ? 1.055 * Math.pow(b, 1/2.4) - 0.055 : 12.92 * b;
+      return [r * 255, g * 255, b * 255];
+    }
+
+    function xyzToLab(x, y, z) {
+      let refX = 95.047, refY = 100.000, refZ = 108.883;
+      x /= refX; y /= refY; z /= refZ;
+      function f(val) { return val > 0.008856 ? Math.cbrt(val) : (7.787 * val) + (16 / 116); }
+      x = f(x); y = f(y); z = f(z);
+      return [(116 * y) - 16, 500 * (x - y), 200 * (y - z)];
+    }
+
+    function labToXyz(l, a, b) {
+      let y = (l + 16) / 116;
+      let x = a / 500 + y;
+      let z = y - b / 200;
+      function fInv(val) { return Math.pow(val, 3) > 0.008856 ? Math.pow(val, 3) : (val - 16 / 116) / 7.787; }
+      return [fInv(x) * 95.047, fInv(y) * 100.000, fInv(z) * 108.883];
+    }
+
+    function labToRgb(l, a, b) {
+      let xyz = labToXyz(l, a, b);
+      return xyzToRgb(xyz[0], xyz[1], xyz[2]);
+    }
+
+    function rgbToLab(r, g, b) {
+      let xyz = rgbToXyz(r, g, b);
+      return xyzToLab(xyz[0], xyz[1], xyz[2]);
+    }
+
+    function setInputs(prefix, val) {
+      document.getElementById(prefix + '-range').value = val;
+      document.getElementById(prefix + '-num').value = val;
+    }
+
+    function updateAllFromRgb(r, g, b) {
+      if (isUpdating) return;
+      isUpdating = true;
+
+      let warningText = "";
+      let clampedR = Math.min(255, Math.max(0, r));
+      let clampedG = Math.min(255, Math.max(0, g));
+      let clampedB = Math.min(255, Math.max(0, b));
+
+      if (r !== clampedR || g !== clampedG || b !== clampedB) {
+        warningText = "Предупреждение: Цвет выходит за пределы цветового охвата RGB!";
+      }
+
+      document.getElementById('warning').innerText = warningText;
+
+      setInputs('r', Math.round(clampedR));
+      setInputs('g', Math.round(clampedG));
+      setInputs('b', Math.round(clampedB));
+
+      let cmyk = rgbToCmyk(clampedR, clampedG, clampedB);
+      setInputs('c', cmyk[0]); setInputs('m', cmyk[1]); setInputs('y', cmyk[2]); setInputs('k', cmyk[3]);
+
+      let hsv = rgbToHsv(clampedR, clampedG, clampedB);
+      setInputs('hsv-h', hsv[0]); setInputs('hsv-s', hsv[1]); setInputs('hsv-v', hsv[2]);
+
+      let lab = rgbToLab(clampedR, clampedG, clampedB);
+      setInputs('lab-l', Math.round(lab[0]));
+      setInputs('lab-a', Math.round(lab[1]));
+      setInputs('lab-b', Math.round(lab[2]));
+
+      document.getElementById('color-preview').style.backgroundColor = "rgb(" + Math.round(clampedR) + "," + Math.round(clampedG) + "," + Math.round(clampedB) + ")";
+      
+      let hexR = Math.round(clampedR).toString(16).padStart(2, '0');
+      let hexG = Math.round(clampedG).toString(16).padStart(2, '0');
+      let hexB = Math.round(clampedB).toString(16).padStart(2, '0');
+      document.getElementById('native-picker').value = "#" + hexR + hexG + hexB;
+
+      isUpdating = false;
+    }
+
+    function bindGroup(prefix, onChange) {
+      let range = document.getElementById(prefix + '-range');
+      let num = document.getElementById(prefix + '-num');
+      range.addEventListener('input', function() { num.value = range.value; onChange(); });
+      num.addEventListener('input', function() { range.value = num.value; onChange(); });
+    }
+
+    bindGroup('r', function() { updateAllFromRgb(+document.getElementById('r-num').value, +document.getElementById('g-num').value, +document.getElementById('b-num').value); });
+    bindGroup('g', function() { updateAllFromRgb(+document.getElementById('r-num').value, +document.getElementById('g-num').value, +document.getElementById('b-num').value); });
+    bindGroup('b', function() { updateAllFromRgb(+document.getElementById('r-num').value, +document.getElementById('g-num').value, +document.getElementById('b-num').value); });
+
+    bindGroup('c', updateFromCmyk); bindGroup('m', updateFromCmyk); bindGroup('y', updateFromCmyk); bindGroup('k', updateFromCmyk);
+    function updateFromCmyk() {
+      let rgb = cmykToRgb(+document.getElementById('c-num').value, +document.getElementById('m-num').value, +document.getElementById('y-num').value, +document.getElementById('k-num').value);
+      updateAllFromRgb(rgb[0], rgb[1], rgb[2]);
+    }
+
+    bindGroup('hsv-h', updateFromHsv); bindGroup('hsv-s', updateFromHsv); bindGroup('hsv-v', updateFromHsv);
+    function updateFromHsv() {
+      let rgb = hsvToRgb(+document.getElementById('hsv-h-num').value, +document.getElementById('hsv-s-num').value, +document.getElementById('hsv-v-num').value);
+      updateAllFromRgb(rgb[0], rgb[1], rgb[2]);
+    }
+
+    bindGroup('lab-l', updateFromLab); bindGroup('lab-a', updateFromLab); bindGroup('lab-b', updateFromLab);
+    function updateFromLab() {
+      let rgb = labToRgb(+document.getElementById('lab-l-num').value, +document.getElementById('lab-a-num').value, +document.getElementById('lab-b-num').value);
+      updateAllFromRgb(rgb[0], rgb[1], rgb[2]);
+    }
+
+    document.getElementById('native-picker').addEventListener('input', function(e) {
+      let hex = e.target.value;
+      let r = parseInt(hex.substr(1,2), 16);
+      let g = parseInt(hex.substr(3,2), 16);
+      let b = parseInt(hex.substr(5,2), 16);
+      updateAllFromRgb(r, g, b);
+    });
+
+    updateAllFromRgb(255, 0, 0);
+  </script>
+</body>
+</html>
