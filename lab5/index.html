@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Лабораторная работа 5 - Вариант 1 (Сазерленд-Коэн)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1e1e1e;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+        h2 { margin-bottom: 10px; }
+        canvas {
+            border: 2px solid #555;
+            background-color: #121212;
+            cursor: default;
+        }
+        .info {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #ccc;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Лабораторная работа №5: Алгоритм Сазерленда-Коэна</h2>
+<canvas id="canvas" width="800" height="600"></canvas>
+<div class="info">
+    <p>💡 <b>Инструкция:</b> Зажмите левую кнопку мыши внутри окна, чтобы перетаскивать его. Отсеченные отрезки подсвечиваются зеленым цветом.</p>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+// --- 1. ТРЕБОВАНИЯ 10А: Робастность (EPS = 1e-7) ---
+const EPS = 1e-7;
+function epsEqual(a, b) { return Math.abs(a - b) < EPS; }
+function epsLess(a, b) { return (b - a) > EPS; }
+function epsGreater(a, b) { return (a - b) > EPS; }
+
+// --- Геометрические структуры ---
+class Rectangle {
+    constructor(xmin, ymin, xmax, ymax) {
+        this.xmin = xmin;
+        this.ymin = ymin;
+        this.xmax = xmax;
+        this.ymax = ymax;
+    }
+}
+
+class Segment {
+    constructor(x1, y1, x2, y2) {
+        this.x1 = x1; this.y1 = y1;
+        this.x2 = x2; this.y2 = y2;
+    }
+}
+
+// --- 2. АЛГОРИТМ САЗЕРЛЕНДА-КОЭНА ---
+const INSIDE = 0; // 0000
+const LEFT   = 1; // 0001
+const RIGHT  = 2; // 0010
+const BOTTOM = 4; // 0100
+const TOP    = 8; // 1000
+
+function computeCode(x, y, rect) {
+    let code = INSIDE;
+    if (epsLess(x, rect.xmin))         code |= LEFT;
+    else if (epsGreater(x, rect.xmax)) code |= RIGHT;
+    if (epsLess(y, rect.ymin))         code |= BOTTOM;
+    else if (epsGreater(y, rect.ymax)) code |= TOP;
+    return code;
+}
+
+function cohenSutherlandClip(seg, rect) {
+    let x1 = seg.x1, y1 = seg.y1;
+    let x2 = seg.x2, y2 = seg.y2;
+
+    let code1 = computeCode(x1, y1, rect);
+    let code2 = computeCode(x2, y2, rect);
+    let accept = false;
+
+    while (true) {
+        if (!(code1 | code2)) {
+            // Обе точки внутри
+            accept = true;
+            break;
+        } else if (code1 & code2) {
+            // Обе точки в одной внешней зоне
+            break;
+        } else {
+            let x = 0, y = 0;
+            let outcode = code1 ? code1 : code2;
+
+            if (outcode & TOP) {
+                x = x1 + (x2 - x1) * (rect.ymax - y1) / (y2 - y1);
+                y = rect.ymax;
+            } else if (outcode & BOTTOM) {
+                x = x1 + (x2 - x1) * (rect.ymin - y1) / (y2 - y1);
+                y = rect.ymin;
+            } else if (outcode & RIGHT) {
+                y = y1 + (y2 - y1) * (rect.xmax - x1) / (x2 - x1);
+                x = rect.xmax;
+            } else if (outcode & LEFT) {
+                y = y1 + (y2 - y1) * (rect.xmin - x1) / (x2 - x1);
+                x = rect.xmin;
+            }
+
+            if (outcode === code1) {
+                x1 = x; y1 = y;
+                code1 = computeCode(x1, y1, rect);
+            } else {
+                x2 = x; y2 = y;
+                code2 = computeCode(x2, y2, rect);
+            }
+        }
+    }
+
+    return accept ? new Segment(x1, y1, x2, y2) : null;
+}
+
+// --- Данные для отрисовки ---
+const rect = new Rectangle(200, 150, 600, 450);
+const segments = [
+    new Segment(100, 200, 700, 350),
+    new Segment(250, 50, 400, 550),
+    new Segment(50, 50, 150, 120),  // Полностью снаружи
+    new Segment(300, 200, 500, 400) // Полностью внутри
+];
+
+// --- Интерактив (Перетаскивание) ---
+let isDragging = false;
+let dragOffset = { x: 0, y: 0 };
+
+canvas.addEventListener('mousedown', (e) => {
+    const r = canvas.getBoundingClientRect();
+    const mx = e.clientX - r.left;
+    const my = e.clientY - r.top;
+
+    if (mx >= rect.xmin && mx <= rect.xmax && my >= rect.ymin && my <= rect.ymax) {
+        isDragging = true;
+        dragOffset.x = mx - rect.xmin;
+        dragOffset.y = my - rect.ymin;
+    }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    if (isDragging) {
+        const r = canvas.getBoundingClientRect();
+        const mx = e.clientX - r.left;
+        const my = e.clientY - r.top;
+        const w = rect.xmax - rect.xmin;
+        const h = rect.ymax - rect.ymin;
+
+        rect.xmin = mx - dragOffset.x;
+        rect.ymin = my - dragOffset.y;
+        rect.xmax = rect.xmin + w;
+        rect.ymax = rect.ymin + h;
+        draw();
+    }
+});
+
+canvas.addEventListener('mouseup', () => { isDragging = false; });
+
+// --- Функция отрисовки ---
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 1. Отрисовка координатной сетки
+    ctx.strokeStyle = '#2a2a2a';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < canvas.width; x += 50) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+    }
+    for (let y = 0; y < canvas.height; y += 50) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    }
+
+    // 2. Отрисовка исходных отрезков (серый цвет)
+    ctx.strokeStyle = '#555555';
+    ctx.lineWidth = 2;
+    for (let seg of segments) {
+        ctx.beginPath();
+        ctx.moveTo(seg.x1, seg.y1);
+        ctx.lineTo(seg.x2, seg.y2);
+        ctx.stroke();
+    }
+
+    // 3. Отрисовка окна отсечения (голубой рамкой)
+    ctx.strokeStyle = '#00e5ff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(rect.xmin, rect.ymin, rect.xmax - rect.xmin, rect.ymax - rect.ymin);
+
+    // 4. Отрисовка видимых частей отрезков (зеленый цвет)
+    ctx.strokeStyle = '#00ff66';
+    ctx.lineWidth = 3;
+    for (let seg of segments) {
+        let clipped = cohenSutherlandClip(seg, rect);
+        if (clipped) {
+            ctx.beginPath();
+            ctx.moveTo(clipped.x1, clipped.y1);
+            ctx.lineTo(clipped.x2, clipped.y2);
+            ctx.stroke();
+        }
+    }
+}
+
+draw();
+</script>
+</body>
+</html>
